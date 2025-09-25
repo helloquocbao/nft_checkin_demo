@@ -1,10 +1,6 @@
-module nft_checkin::mint_payment;
+module nft_checkin::utils_helper;
 
-use sui::coin::{Self, Coin};
-use sui::sui::SUI;
-
-/// Yêu cầu thêm phí 1 SUI khi mint (ngoài gas)
-/// TODO: chuyển coin này về ví chủ dự án
-public fun pay_extra(coin: Coin<SUI>): Coin<SUI> {
-    coin
+/// Helper utilities for NFT operations
+public fun placeholder(): u64 {
+    42
 }
