@@ -1,5 +1,9 @@
 module nft_checkin::nft_frame;
 
+use nft_checkin::nft_perfection;
+use nft_checkin::nft_rarity;
+use nft_checkin::utils_random;
+
 /// NFT struct khung avatar
 public struct AvatarFrame has key, store {
     id: UID,
@@ -26,19 +30,18 @@ public fun new(
     }
 }
 
-/// Getter functions
-public fun owner(frame: &AvatarFrame): address {
-    frame.owner
-}
+/// Mint NFT AvatarFrame, trả về cho client
+public entry fun mint_and_transfer(position: u64, ctx: &mut TxContext) {
+    let seed = utils_random::rand_u64(ctx);
+    let rarity = nft_rarity::get_rarity(seed);
+    let perfection_score = nft_perfection::get_perfection(seed);
 
-public fun collection_id(frame: &AvatarFrame): u64 {
-    frame.collection_id
-}
-
-public fun rarity(frame: &AvatarFrame): u8 {
-    frame.rarity
-}
-
-public fun perfection_score(frame: &AvatarFrame): u64 {
-    frame.perfection_score
+    let frame = new(
+        tx_context::sender(ctx),
+        position,
+        rarity,
+        perfection_score,
+        ctx,
+    );
+    transfer::transfer(frame, tx_context::sender(ctx));
 }
