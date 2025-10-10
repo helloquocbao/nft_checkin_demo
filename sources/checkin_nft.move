@@ -1,16 +1,13 @@
 module checkin_nft::checkin_nft {
+    use std::hash;
     use std::string;
-     use sui::tx_context;
-    use sui::tx_context::TxContext;
+    use std::bcs;
+    use sui::tx_context::{Self, TxContext};
     use sui::transfer;
     use sui::object;
     use sui::event;
-    use sui::random;
-    use checkin_nft::rarity_helper;
     use checkin_nft::events;
-    use checkin_nft::constants;
 
-    /// NFT có thể nâng cấp (gacha / re-roll)
     public struct CheckinNFT has key, store {
         id: UID,
         name: string::String,
@@ -20,63 +17,80 @@ module checkin_nft::checkin_nft {
         owner: address,
     }
 
-    /// Mint NFT mới
-  public entry fun mint(
-    name: string::String,
-    image_url: string::String,
-     r: &random::Random,
-    ctx: &mut TxContext
-) {
-    let sender = tx_context::sender(ctx);
-    let rarity = rarity_helper::random_rarity(r, ctx);
-    let completion = rarity_helper::random_completion(r, ctx);
+    /// 🎲 Sinh số "ngẫu nhiên" 1–100 dựa trên digest hash
+    fun random_number(ctx: &TxContext): u64 {
+        // ✅ digest có kiểu `object::ID`, encode ra bytes bằng BCS
+        let digest = tx_context::digest(ctx);
+        let seed = bcs::to_bytes(digest); // 👈 bỏ dấu & để truyền by-value
 
-    let nft = CheckinNFT {
-        id: object::new(ctx),
-        name,
-        image_url,
-        rarity,
-        completion,
-        owner: sender,
-    };
+        // ✅ Hash bằng SHA3-256
+        let hash_bytes = hash::sha3_256(seed);
 
-  events::emit_mint_event(sender, rarity, completion);
-    transfer::transfer(nft, sender);
-}
+        // ✅ Lấy 8 byte đầu tiên để tạo u64
+        let mut val: u64 = 0;
+        let mut i = 0;
+        while (i < 8) {
+           val = (val << 8) | ((*vector::borrow(&hash_bytes, i)) as u64);
 
-    /// Upgrade chỉ số NFT (chỉ chủ sở hữu mới có quyền)
-  public entry fun upgrade(
-    nft: &mut CheckinNFT,
-      r: &random::Random,
-    ctx: &mut TxContext
-) {
-    let sender = tx_context::sender(ctx);
-    assert!(nft.owner == sender, 0);
+            i = i + 1;
+        };
 
-    let new_completion = rarity_helper::random_completion(r, ctx);
-    let new_rarity = rarity_helper::random_rarity(r, ctx);
+        // ✅ Random trong khoảng 1–100
+        (val % 100) + 1
+    }
 
-    nft.completion = new_completion;
-    nft.rarity = new_rarity;
+    /// 📊 Xác định độ hiếm (rarity)
+    public fun rarity_from_number(num: u64): string::String {
+        if (num <= 80) {
+            string::utf8(b"Common")
+        } else if (num <= 95) {
+            string::utf8(b"Epic")
+        } else {
+            string::utf8(b"Legendary")
+        }
+    }
 
-  events::emit_upgrade_event(sender, new_rarity, new_completion);
-}
+    /// 🪄 Mint NFT mới (không cần Random object)
+    public entry fun mint(
+        name: string::String,
+        image_url: string::String,
+        ctx: &mut TxContext
+    ) {
+        let sender = tx_context::sender(ctx);
 
+        let num = random_number(ctx);
+        let rarity = rarity_from_number(num);
+        let completion = num;
 
-public entry fun transfer_nft(
-    nft: CheckinNFT,
-    recipient: address,
-    ctx: &mut TxContext
-) {
-    let sender = tx_context::sender(ctx);
-    assert!(get_owner(&nft) == sender, 0);
+        let nft = CheckinNFT {
+            id: object::new(ctx),
+            name,
+            image_url,
+            rarity,
+            completion,
+            owner: sender,
+        };
 
-    let mut nft_mut = nft;
-    nft_mut.owner = recipient;
-    transfer::transfer(nft_mut, recipient);
-}
+        events::emit_mint_event(sender, rarity, completion);
+        transfer::transfer(nft, sender);
+    }
 
+    /// 🔄 Transfer NFT
+    public entry fun transfer_nft(
+        nft: CheckinNFT,
+        recipient: address,
+        ctx: &mut TxContext
+    ) {
+        let sender = tx_context::sender(ctx);
+        assert!(get_owner(&nft) == sender, 0);
+
+        let mut nft_mut = nft;
+        nft_mut.owner = recipient;
+        transfer::transfer(nft_mut, recipient);
+    }
+
+    /// 📍 Lấy chủ sở hữu NFT
     public fun get_owner(nft: &CheckinNFT): address {
-    nft.owner
-}
+        nft.owner
+    }
 }
