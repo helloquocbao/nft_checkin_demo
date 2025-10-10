@@ -15,6 +15,8 @@ module checkin_nft::checkin_nft {
         rarity: string::String,
         completion: u64,
         owner: address,
+        latitude: string::String,   // 🧭 Vĩ độ
+        longitude: string::String,  // 🧭 Kinh độ
     }
 
     /// 🎲 Sinh số "ngẫu nhiên" 1–100 dựa trên digest hash
@@ -54,6 +56,8 @@ module checkin_nft::checkin_nft {
     public entry fun mint(
         name: string::String,
         image_url: string::String,
+         latitude: string::String,
+        longitude: string::String,
         ctx: &mut TxContext
     ) {
         let sender = tx_context::sender(ctx);
@@ -69,6 +73,8 @@ module checkin_nft::checkin_nft {
             rarity,
             completion,
             owner: sender,
+            latitude,
+            longitude,
         };
 
         events::emit_mint_event(sender, rarity, completion);
@@ -93,4 +99,9 @@ module checkin_nft::checkin_nft {
     public fun get_owner(nft: &CheckinNFT): address {
         nft.owner
     }
+
+
+  
+
+
 }
