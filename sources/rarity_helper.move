@@ -1,28 +1,38 @@
 module checkin_nft::rarity_helper {
-    use std::string;
-    use sui::random::{Self, Random};
-    use sui::tx_context::TxContext;
-    use checkin_nft::constants;
 
-    /// Random rarity dựa theo tỷ lệ trong constants
-    public fun random_rarity(r: &Random, ctx: &mut TxContext): string::String {
-        // ✅ new_generator cần r + ctx
-        let mut gen = random::new_generator(r, ctx);
+use std::bcs;
+use std::hash;
+use std::string;
 
-        let seed = random::generate_u64_in_range(&mut gen, 0, 100);
+    public fun random_number(ctx: &TxContext, min: u64, max: u64): u64 {
+    // ✅ digest có kiểu `object::ID`, encode ra bytes bằng BCS
+    let digest = tx_context::digest(ctx);
+    let seed = bcs::to_bytes(digest); // 👈 bỏ dấu & để truyền by-value
 
-        if (seed < constants::common_rate()) {
-            string::utf8(b"Common")
-        } else if (seed < constants::common_rate() + constants::epic_rate()) {
-            string::utf8(b"Epic")
-        } else {
-            string::utf8(b"Legendary")
-        }
+    // ✅ Hash bằng SHA3-256
+    let hash_bytes = hash::sha3_256(seed);
+
+    // ✅ Lấy 8 byte đầu tiên để tạo u64
+    let mut val: u64 = 0;
+    let mut i = 0;
+    while (i < 8) {
+        val = (val << 8) | ((*vector::borrow(&hash_bytes, i)) as u64);
+
+        i = i + 1;
+    };
+
+    let range = (max - min) + 1;
+    (val % range) + min
+
     }
 
-    /// Random completion trong khoảng 0–MAX_COMPLETION
-    public fun random_completion(r: &Random, ctx: &mut TxContext): u64 {
-        let mut gen = random::new_generator(r, ctx);
-        random::generate_u64_in_range(&mut gen, 0, constants::max_completion() + 1)
+    public fun rarity_from_number(num: u64): string::String {
+    if (num <= 80) {
+        string::utf8(b"Common")
+    } else if (num <= 98) {
+        string::utf8(b"Epic")
+    } else {
+        string::utf8(b"Legendary")
     }
+}
 }
